@@ -11,54 +11,117 @@ def land_records(base_uri, district_id, mandal_id, village_id, survey_no, khata_
   
   land_record_url = Addressable::URI.parse(base_uri+"/getPublicDataInfo?villageId=#{village_id}&flagToSearch=surveynumber&searchData=#{survey_no}&flagval=district&district=#{district_id}&mandal=#{mandal_id}&divi=&khataNoIdselect=#{khata_no}&ReqType=Citizen").display_uri.to_s
   puts land_record_url
-  land_record = {}
+
+  land_record = {district_name: "", district_telegu_name: "", mandal_name: "", mandal_telegu_name: "", village_name: "", village_telegu_name: "", survey_no: "", pattadar_name: "", father_husband_name: "", total_extent: "", land_status: "", land_type: "", nature_of_land: "", classification_of_land: "", market_value_of_survey_no_inr: "", transaction_status: "", ppb_no: ""}
+
   land_record_response = HTTParty.get(land_record_url)
   land_record_body = land_record_response.body
   str_senitize = land_record_body.gsub(/\t/, '').gsub(/\r/, '').gsub(/\n/, '')
   land_record_arr = str_senitize.split('<div class="row p-3">')
   land_record_arr.each_with_index do |lr, index|
     next if index == 0
-    if index == 1
-      lr1 = lr.split('<div class="col-12 col-sm-4">')
-      district = lr1[1].split('</div>')[0].split('<br>')[1].split('|')
-      mandal = lr1[2].split('</div>')[0].split('<br>')[1].split('|')
-      village = lr1[3].split('</div>')[0].split('<br>')[1].split('|')
-      lr1_hash = { district_name:  district[0], district_telegu_name: district[1], mandal_name: mandal[0], mandal_telegu_name: mandal[1], village_name:  village[0], village_telegu_name: village[1]}
-      land_record.merge!(lr1_hash)
-    elsif index == 2
-      lr2 = lr.split('<div class="col-12 col-sm-4">')
-      survey_no = lr2[1].split('</div>')[0].split('<br>')
-      pattadar_name = lr2[2].split('</div>')[0].split('<br>')
-      father_husband_name = lr2[3].split('</div>')[0].split('<br>')
-      lr2_hash = { survey_no:  survey_no[1], pattadar_name: pattadar_name[1], father_husband_name: father_husband_name[1]}
-      land_record.merge!(lr2_hash)
-    elsif index == 3
-      lr3 = lr.split('<div class="col-12 col-sm-4">')
-      total_extent = lr3[1].split('</div>')[0].split('<br>')
-      land_status = lr3[2].split('</div>')[0].split('<br>')
-      land_type = lr3[3].split('</div>')[0].split('<br>')
-      lr3_hash = { total_extent:  total_extent[1], land_status: land_status[1], land_type: land_type[1]}
-      land_record.merge!(lr3_hash)
-    elsif index == 4
-      lr4 = lr.split('<div class="col-12 col-sm-4">')
-      nature_of_land = lr4[1].split('</div>')[0].split('<br>')
-      classification_of_land = lr4[2].split('</div>')[0].split('<br>')
-      market_value_of_survey_no_inr = lr4[3].split('</div>')[0].split('<br>')
-      lr4_hash = { nature_of_land:  nature_of_land[1], classification_of_land: classification_of_land[1], market_value_of_survey_no_inr: market_value_of_survey_no_inr[1]}
-      land_record.merge!(lr4_hash)
-    elsif index == 5
-      lr5 = lr.split('<div class="col-12 col-sm-4">')
-      transaction_status = lr.split('<ahref=')[0].split("<br>")
-      ekyc_status = lr5[1].split('</div>')[0].split('<br>')      
-      lr5_hash = { transaction_status:  transaction_status[1], ekyc_status: ekyc_status[1]}
-      land_record.merge!(lr5_hash)
-    elsif index == 6
+    sm4 = lr.match(/<div class="col-12 col-sm-4">/)
+    sm8 = lr.match(/<div class="col-12 col-sm-8">/)
+    last = lr.match(/script/)
+    
+    if sm8.present?
+      if  lr.match(/<div class="col-12 col-sm-4">/)
+        lr5 = lr.split('<div class="col-12 col-sm-4">')
+        transaction_status = lr.split('<ahref=')[0].split("<br>")
+        ekyc_status = lr5[1].split('</div>')[0].split('<br>')
+      else
+        lr5 = lr.split('<div class="col-12 col-sm-3">')
+        transaction_status = lr.split('<ahref=')[0].split("<br>")
+        ekyc_status = lr5[1].split('</div>')[0].split('<br>')
+      end
+      land_record[:transaction_status] = transaction_status[1].strip
+      # land_record[:ekyc_status] = ekyc_status[1].strip
+    elsif last.present?
       lr6 = lr.split("</div></div></div></div></form><script></script></body></html>")[0].split("<br>")
       ppb_no = lr6[1] 
-      lr6_hash = { ppb_no:  ppb_no[1]}
-      land_record.merge!(lr6_hash)
+      land_record[:ppb_no] = ppb_no[1].strip
+    elsif sm4.present?
+      lr1 = lr.split('<div class="col-12 col-sm-4">')
+      lr1.each_with_index do |lan_rec, r_index|
+        next if r_index == 0
+        rec = lan_rec.split('</div>')[0].split('<br>')
+        if lan_rec.match(/District/)
+          district = rec[1].split('|')
+          land_record[:district_name] = district[0].strip
+          land_record[:district_telegu_name] = district[1].strip
+        elsif lan_rec.match(/Mandal/)
+          mandal = rec[1].split('|')
+          land_record[:mandal_name] = mandal[0].strip
+          land_record[:mandal_telegu_name] = mandal[1].strip
+        elsif lan_rec.match(/Village/)
+          village = rec[1].split('|')
+          land_record[:village_name] = village[0].strip
+          land_record[:village_telegu_name] = village[1].strip
+        elsif lan_rec.match(/Survey No/)
+          land_record[:survey_no] = rec[1].strip
+        elsif lan_rec.match(/Pattadar Name/)
+          land_record[:pattadar_name] = rec[1].strip
+        elsif lan_rec.match(/Husband's Name/)
+          land_record[:father_husband_name] = rec[1].strip
+        elsif lan_rec.match(/Total Extent/)
+          land_record[:total_extent] = rec[1].strip
+        elsif lan_rec.match(/Land Status/)
+          land_record[:land_status] = rec[1].strip
+        elsif lan_rec.match(/Land Type/)
+          land_record[:land_type] = rec[1].strip
+        elsif lan_rec.match(/Nature of Land/)
+          land_record[:nature_of_land] = rec[1].strip
+        elsif lan_rec.match(/Classification of Land/)
+          land_record[:classification_of_land] = rec[1].strip
+        elsif lan_rec.match(/Market value of Survey/)
+          land_record[:market_value_of_survey_no_inr] = rec[1].strip
+        end
+      end
     end
   end
+  # land_record_arr.each_with_index do |lr, index|
+  #   next if index == 0
+  #   if index == 1
+  #     lr1 = lr.split('<div class="col-12 col-sm-4">')
+  #     district = lr1[1].split('</div>')[0].split('<br>')[1].split('|')
+  #     mandal = lr1[2].split('</div>')[0].split('<br>')[1].split('|')
+  #     village = lr1[3].split('</div>')[0].split('<br>')[1].split('|')
+  #     lr1_hash = { district_name:  district[0], district_telegu_name: district[1], mandal_name: mandal[0], mandal_telegu_name: mandal[1], village_name:  village[0], village_telegu_name: village[1]}
+  #     land_record.merge!(lr1_hash)
+  #   elsif index == 2
+  #     lr2 = lr.split('<div class="col-12 col-sm-4">')
+  #     survey_no = lr2[1].split('</div>')[0].split('<br>')
+  #     pattadar_name = lr2[2].split('</div>')[0].split('<br>')
+  #     father_husband_name = lr2[3].split('</div>')[0].split('<br>')
+  #     lr2_hash = { survey_no:  survey_no[1], pattadar_name: pattadar_name[1], father_husband_name: father_husband_name[1]}
+  #     land_record.merge!(lr2_hash)
+  #   elsif index == 3
+  #     lr3 = lr.split('<div class="col-12 col-sm-4">')
+  #     total_extent = lr3[1].split('</div>')[0].split('<br>')
+  #     land_status = lr3[2].split('</div>')[0].split('<br>')
+  #     land_type = lr3[3].split('</div>')[0].split('<br>')
+  #     lr3_hash = { total_extent:  total_extent[1], land_status: land_status[1], land_type: land_type[1]}
+  #     land_record.merge!(lr3_hash)
+  #   elsif index == 4
+  #     lr4 = lr.split('<div class="col-12 col-sm-4">')
+  #     nature_of_land = lr4[1].split('</div>')[0].split('<br>')
+  #     classification_of_land = lr4[2].split('</div>')[0].split('<br>')
+  #     market_value_of_survey_no_inr = lr4[3].split('</div>')[0].split('<br>')
+  #     lr4_hash = { nature_of_land:  nature_of_land[1], classification_of_land: classification_of_land[1], market_value_of_survey_no_inr: market_value_of_survey_no_inr[1]}
+  #     land_record.merge!(lr4_hash)
+  #   elsif index == 5
+  #     lr5 = lr.split('<div class="col-12 col-sm-4">')
+  #     transaction_status = lr.split('<ahref=')[0].split("<br>")
+  #     ekyc_status = lr5[1].split('</div>')[0].split('<br>')      
+  #     lr5_hash = { transaction_status:  transaction_status[1], ekyc_status: ekyc_status[1]}
+  #     land_record.merge!(lr5_hash)
+  #   elsif index == 6
+  #     lr6 = lr.split("</div></div></div></div></form><script></script></body></html>")[0].split("<br>")
+  #     ppb_no = lr6[1] 
+  #     lr6_hash = { ppb_no:  ppb_no[1]}
+  #     land_record.merge!(lr6_hash)
+  #   end
+  # end
   return land_record
 end
 
