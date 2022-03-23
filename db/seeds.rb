@@ -62,9 +62,19 @@ def land_records(base_uri, district_id, mandal_id, village_id, survey_no, khata_
   return land_record
 end
 
+def log_generator(log)
+  path = Rails.root.join('log')
+  file_path = path + "seed.log"
+  file = File.new(file_path, "a")
+  file.puts(log)
+  file.close
+end
+
 (1..1).each do |i|
   district = District.new(dist_id: i, name: i)
+  log_generator("District - #{i}")
   if district.save
+    log_generator("=> District - created")
     uri = base_uri+"/getMandalFromDivisionCitizenPortal?district=#{i}"
     mandal_response = HTTParty.get(uri)
     mandal_body = mandal_response.body
@@ -78,7 +88,9 @@ end
       value = m_value_name[0].split("\"")
       name = m_value_name[1].split("|")
       mandal = Mandal.new(district_id: district.id, mand_id: value[1], name: name[0], telgu_name: name[1])
+      log_generator("District - #{i}, Mandal - #{value[1]}")
       if mandal.save
+        log_generator("=> Mandal - created")
         village_uri = base_uri+"/getVillageFromMandalCitizenPortal?mandalId=#{mandal.mand_id}"
         village_response = HTTParty.get(village_uri)
         village_body = village_response.body
@@ -93,7 +105,9 @@ end
           v_name = v_value_name[1].split("|")
           puts v_value[1], v_name.inspect
           village = Village.new(mandal_id: mandal.id, vill_id: v_value[1], name: v_name[0], telgu_name: v_name[1])
+          log_generator("District - #{i}, Mandal - #{value[1]}, Village- #{v_value[1]}")
           if village.save
+            log_generator("=> Village - created")
             survy_url = base_uri+"/getSurveyCitizen?villId=#{village.vill_id}&flag=survey"
             survy_response = HTTParty.get(survy_url)
             survy_body = survy_response.body
@@ -101,12 +115,11 @@ end
             survy_str_senitize = survy_arr[1].gsub(/\t/, '').gsub(/\r/, '').gsub(/\n/, '')
             survy_name = survy_str_senitize.split("</option>")
             
-            survy_name.first(3).each_with_index do |s_name, s_index|
+            survy_name.first(6).each_with_index do |s_name, s_index|
               next if s_index == 0
               next if survy_name.size-1 == s_index
               s_value_name = s_name.split('>')
               puts s_value_name[1]
-              
               kahata_url = Addressable::URI.parse(base_uri+"/getKhataNoCitizen?villId=#{village.vill_id}&flag=khatanos&surveyNo=#{s_value_name[1]}").display_uri.to_s
               puts kahata_url
               kahata_response = HTTParty.get(kahata_url)
@@ -120,14 +133,13 @@ end
                 next if kahata_nos.size-1 == k_index
                 kahata_no = k_no.split('>')
                 survey = Survey.new(village_id: village.id, survey_no: s_value_name[1], khata_no: kahata_no[1])
+                log_generator("District - #{i}, Mandal - #{value[1]}, Village- #{v_value[1]}, Survey - #{s_value_name[1]}, kahata_no - #{kahata_no[1]}")
                 if survey.save
-                  puts "-"*50
-                  puts kahata_no[1]
-                  puts "-"*50
+                  log_generator("=> Survey - created")
                   land_record_hash = land_records(base_uri, district.dist_id, mandal.mand_id, village.vill_id, survey.survey_no, kahata_no[1])
                   land_record_hash.merge!({survey_id: survey.id})
                   land_record = LandRecord.new(land_record_hash)
-                  land_record.save
+                  log_generator("=> LandRecord - created") if land_record.save
                   puts land_record.inspect
                 end
               end
