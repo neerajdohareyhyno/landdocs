@@ -133,10 +133,11 @@ def log_generator(log)
   file.close
 end
 
-(1..1).each do |i|
-  district = District.new(dist_id: i, name: i)
+(1..35).each do |i|
+  district = District.find_or_create_by(dist_id: i, name: i)
   log_generator("District - #{i}")
-  if district.save
+  if district.present?
+    # binding.break
     log_generator("=> District - created")
     uri = base_uri+"/getMandalFromDivisionCitizenPortal?district=#{i}"
     mandal_response = HTTParty.get(uri)
@@ -150,9 +151,9 @@ end
       m_value_name = name.split('">')
       value = m_value_name[0].split("\"")
       name = m_value_name[1].split("|")
-      mandal = Mandal.new(district_id: district.id, mand_id: value[1], name: name[0], telgu_name: name[1])
+      mandal = Mandal.find_or_create_by(district_id: district.id, mand_id: value[1], name: name[0], telgu_name: name[1])
       log_generator("District - #{i}, Mandal - #{value[1]}")
-      if mandal.save
+      if mandal.present?
         log_generator("=> Mandal - created")
         village_uri = base_uri+"/getVillageFromMandalCitizenPortal?mandalId=#{mandal.mand_id}"
         village_response = HTTParty.get(village_uri)
@@ -167,9 +168,9 @@ end
           v_value = v_value_name[0].split("\"")
           v_name = v_value_name[1].split("|")
           puts v_value[1], v_name.inspect
-          village = Village.new(mandal_id: mandal.id, vill_id: v_value[1], name: v_name[0], telgu_name: v_name[1])
+          village = Village.find_or_create_by(mandal_id: mandal.id, vill_id: v_value[1], name: v_name[0], telgu_name: v_name[1])
           log_generator("District - #{i}, Mandal - #{value[1]}, Village- #{v_value[1]}")
-          if village.save
+          if village.present?
             log_generator("=> Village - created")
             survy_url = base_uri+"/getSurveyCitizen?villId=#{village.vill_id}&flag=survey"
             survy_response = HTTParty.get(survy_url)
@@ -195,14 +196,14 @@ end
                 next if k_index == 0
                 next if kahata_nos.size-1 == k_index
                 kahata_no = k_no.split('>')
-                survey = Survey.new(village_id: village.id, survey_no: s_value_name[1], khata_no: kahata_no[1])
+                survey = Survey.find_or_create_by(village_id: village.id, survey_no: s_value_name[1], khata_no: kahata_no[1])
                 log_generator("District - #{i}, Mandal - #{value[1]}, Village- #{v_value[1]}, Survey - #{s_value_name[1]}, kahata_no - #{kahata_no[1]}")
-                if survey.save
+                if survey.present?
                   log_generator("=> Survey - created")
                   land_record_hash = land_records(base_uri, district.dist_id, mandal.mand_id, village.vill_id, survey.survey_no, kahata_no[1])
                   land_record_hash.merge!({survey_id: survey.id})
-                  land_record = LandRecord.new(land_record_hash)
-                  log_generator("=> LandRecord - created") if land_record.save
+                  land_record = LandRecord.find_or_create_by(land_record_hash)
+                  log_generator("=> LandRecord - created") if land_record.present?
                   puts land_record.inspect
                 end
               end
